@@ -24,18 +24,59 @@
         android:layout_width="match_parent"
         android:layout_height="150dp"/>
 
+    <RadioGroup
+        android:id="@+id/sendFormatGroup"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="8dp">
+        <RadioButton
+            android:id="@+id/sendAscii"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="发送ASCII"
+            android:checked="true"/>
+        <RadioButton
+            android:id="@+id/sendHex"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="发送HEX"/>
+    </RadioGroup>
+
     <EditText
         android:id="@+id/sendInput"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="Enter data to send"
-        android:layout_marginTop="8dp"/>
+        android:hint="Enter data to send"/>
 
     <Button
         android:id="@+id/sendBtn"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Send"/>
+
+    <RadioGroup
+        android:id="@+id/receiveFormatGroup"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="8dp">
+        <RadioButton
+            android:id="@+id/receiveAscii"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="接收ASCII"
+            android:checked="true"/>
+        <RadioButton
+            android:id="@+id/receiveHex"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="接收HEX"/>
+    </RadioGroup>
 
     <ScrollView
         android:layout_width="match_parent"

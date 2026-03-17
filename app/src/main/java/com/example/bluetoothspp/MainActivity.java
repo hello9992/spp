@@ -11,6 +11,7 @@ import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ListView;
+import android.widget.RadioGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
@@ -35,6 +36,8 @@ public class MainActivity extends AppCompatActivity {
     private TextView statusText;
     private EditText sendInput;
     private TextView logText;
+    private RadioGroup sendFormatGroup;
+    private RadioGroup receiveFormatGroup;
     private ArrayList<String> logList = new ArrayList<>();
     private boolean isConnected = false;
 
@@ -46,6 +49,8 @@ public class MainActivity extends AppCompatActivity {
         statusText = findViewById(R.id.statusText);
         sendInput = findViewById(R.id.sendInput);
         logText = findViewById(R.id.logText);
+        sendFormatGroup = findViewById(R.id.sendFormatGroup);
+        receiveFormatGroup = findViewById(R.id.receiveFormatGroup);
         Button scanBtn = findViewById(R.id.scanBtn);
         Button sendBtn = findViewById(R.id.sendBtn);
         Button saveLogBtn = findViewById(R.id.saveLogBtn);
@@ -102,8 +107,11 @@ public class MainActivity extends AppCompatActivity {
             while (isConnected) {
                 try {
                     int bytes = inputStream.read(buffer);
-                    String data = new String(buffer, 0, bytes);
-                    String log = getTimestamp() + " RX: " + data;
+                    byte[] data = new byte[bytes];
+                    System.arraycopy(buffer, 0, data, 0, bytes);
+                    String displayData = receiveFormatGroup.getCheckedRadioButtonId() == R.id.receiveHex
+                        ? bytesToHex(data) : new String(data);
+                    String log = getTimestamp() + " RX: " + displayData;
                     logList.add(log);
                     runOnUiThread(() -> logText.append(log + "\n"));
                 } catch (Exception e) {
@@ -118,11 +126,13 @@ public class MainActivity extends AppCompatActivity {
             Toast.makeText(this, "Not connected", Toast.LENGTH_SHORT).show();
             return;
         }
-        String data = sendInput.getText().toString();
+        String input = sendInput.getText().toString();
         new Thread(() -> {
             try {
-                outputStream.write(data.getBytes());
-                String log = getTimestamp() + " TX: " + data;
+                byte[] data = sendFormatGroup.getCheckedRadioButtonId() == R.id.sendHex
+                    ? hexToBytes(input) : input.getBytes();
+                outputStream.write(data);
+                String log = getTimestamp() + " TX: " + input;
                 logList.add(log);
                 runOnUiThread(() -> {
                     logText.append(log + "\n");
@@ -152,6 +162,25 @@ public class MainActivity extends AppCompatActivity {
 
     private String getTimestamp() {
         return new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new Date());
+    }
+
+    private String bytesToHex(byte[] bytes) {
+        StringBuilder sb = new StringBuilder();
+        for (byte b : bytes) {
+            sb.append(String.format("%02X ", b));
+        }
+        return sb.toString().trim();
+    }
+
+    private byte[] hexToBytes(String hex) {
+        hex = hex.replaceAll("\\s+", "");
+        int len = hex.length();
+        byte[] data = new byte[len / 2];
+        for (int i = 0; i < len; i += 2) {
+            data[i / 2] = (byte) ((Character.digit(hex.charAt(i), 16) << 4)
+                + Character.digit(hex.charAt(i + 1), 16));
+        }
+        return data;
     }
 
     @Override
