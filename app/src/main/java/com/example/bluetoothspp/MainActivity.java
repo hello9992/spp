@@ -173,7 +173,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private byte[] hexToBytes(String hex) {
-        hex = hex.replaceAll("\\s+", "");
+        hex = hex.replaceAll("0x|0X", "").replaceAll("\\s+", "");
         int len = hex.length();
         byte[] data = new byte[len / 2];
         for (int i = 0; i < len; i += 2) {
