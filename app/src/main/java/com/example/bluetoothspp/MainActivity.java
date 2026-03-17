@@ -3,10 +3,14 @@ package com.example.bluetoothspp;
 import android.Manifest;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
-import android.bluetooth.BluetoothSocket;
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.Intent;
+import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.IBinder;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
@@ -18,28 +22,22 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import java.io.File;
 import java.io.FileWriter;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.Locale;
 import java.util.Set;
-import java.util.UUID;
 
 public class MainActivity extends AppCompatActivity {
-    private static final UUID SPP_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
     private BluetoothAdapter btAdapter;
-    private BluetoothSocket btSocket;
-    private OutputStream outputStream;
-    private InputStream inputStream;
+    private BluetoothService btService;
+    private boolean serviceBound = false;
     private TextView statusText;
     private EditText sendInput;
     private TextView logText;
     private RadioGroup sendFormatGroup;
     private RadioGroup receiveFormatGroup;
     private ArrayList<String> logList = new ArrayList<>();
-    private boolean isConnected = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -58,7 +56,12 @@ public class MainActivity extends AppCompatActivity {
 
         btAdapter = BluetoothAdapter.getDefaultAdapter();
         requestPermissions(new String[]{Manifest.permission.BLUETOOTH_CONNECT,
-            Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.WRITE_EXTERNAL_STORAGE}, 1);
+            Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.WRITE_EXTERNAL_STORAGE,
+            Manifest.permission.POST_NOTIFICATIONS, Manifest.permission.FOREGROUND_SERVICE}, 1);
+
+        Intent intent = new Intent(this, BluetoothService.class);
+        startForegroundService(intent);
+        bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
 
         scanBtn.setOnClickListener(v -> scanDevices(deviceList));
         sendBtn.setOnClickListener(v -> sendData());
@@ -67,9 +70,39 @@ public class MainActivity extends AppCompatActivity {
         deviceList.setOnItemClickListener((parent, view, position, id) -> {
             String item = (String) parent.getItemAtPosition(position);
             String address = item.substring(item.length() - 17);
-            connectDevice(address);
+            if (serviceBound) btService.connect(address);
         });
     }
+
+    private final ServiceConnection serviceConnection = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder service) {
+            BluetoothService.LocalBinder binder = (BluetoothService.LocalBinder) service;
+            btService = binder.getService();
+            serviceBound = true;
+            btService.setDataListener(new BluetoothService.DataListener() {
+                @Override
+                public void onDataReceived(byte[] data) {
+                    int checkedId = receiveFormatGroup.getCheckedRadioButtonId();
+                    String displayData = checkedId == R.id.receiveHex ? bytesToHex(data)
+                        : checkedId == R.id.receiveDec ? bytesToDec(data) : new String(data);
+                    String log = getTimestamp() + " RX: " + displayData;
+                    logList.add(log);
+                    runOnUiThread(() -> logText.append(log + "\n"));
+                }
+
+                @Override
+                public void onStatusChanged(String status) {
+                    runOnUiThread(() -> statusText.setText(status));
+                }
+            });
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+            serviceBound = false;
+        }
+    };
 
     private void scanDevices(ListView listView) {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) return;
@@ -83,66 +116,19 @@ public class MainActivity extends AppCompatActivity {
         statusText.setText("Found " + deviceNames.size() + " devices");
     }
 
-    private void connectDevice(String address) {
-        new Thread(() -> {
-            try {
-                if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) return;
-                BluetoothDevice device = btAdapter.getRemoteDevice(address);
-                btSocket = device.createRfcommSocketToServiceRecord(SPP_UUID);
-                btSocket.connect();
-                outputStream = btSocket.getOutputStream();
-                inputStream = btSocket.getInputStream();
-                isConnected = true;
-                runOnUiThread(() -> statusText.setText("Connected to " + address));
-                startReceiving();
-            } catch (Exception e) {
-                runOnUiThread(() -> statusText.setText("Connection failed: " + e.getMessage()));
-            }
-        }).start();
-    }
-
-    private void startReceiving() {
-        new Thread(() -> {
-            byte[] buffer = new byte[1024];
-            while (isConnected) {
-                try {
-                    int bytes = inputStream.read(buffer);
-                    byte[] data = new byte[bytes];
-                    System.arraycopy(buffer, 0, data, 0, bytes);
-                    int checkedId = receiveFormatGroup.getCheckedRadioButtonId();
-                    String displayData = checkedId == R.id.receiveHex ? bytesToHex(data)
-                        : checkedId == R.id.receiveDec ? bytesToDec(data) : new String(data);
-                    String log = getTimestamp() + " RX: " + displayData;
-                    logList.add(log);
-                    runOnUiThread(() -> logText.append(log + "\n"));
-                } catch (Exception e) {
-                    isConnected = false;
-                }
-            }
-        }).start();
-    }
-
     private void sendData() {
-        if (!isConnected) {
+        if (!serviceBound || !btService.isConnected()) {
             Toast.makeText(this, "Not connected", Toast.LENGTH_SHORT).show();
             return;
         }
         String input = sendInput.getText().toString();
-        new Thread(() -> {
-            try {
-                byte[] data = sendFormatGroup.getCheckedRadioButtonId() == R.id.sendHex
-                    ? hexToBytes(input) : input.getBytes();
-                outputStream.write(data);
-                String log = getTimestamp() + " TX: " + input;
-                logList.add(log);
-                runOnUiThread(() -> {
-                    logText.append(log + "\n");
-                    sendInput.setText("");
-                });
-            } catch (Exception e) {
-                runOnUiThread(() -> Toast.makeText(this, "Send failed", Toast.LENGTH_SHORT).show());
-            }
-        }).start();
+        byte[] data = sendFormatGroup.getCheckedRadioButtonId() == R.id.sendHex
+            ? hexToBytes(input) : input.getBytes();
+        btService.send(data);
+        String log = getTimestamp() + " TX: " + input;
+        logList.add(log);
+        logText.append(log + "\n");
+        sendInput.setText("");
     }
 
     private void saveLog() {
@@ -195,9 +181,9 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        isConnected = false;
-        try {
-            if (btSocket != null) btSocket.close();
-        } catch (Exception e) {}
+        if (serviceBound) {
+            unbindService(serviceConnection);
+            serviceBound = false;
+        }
     }
 }
