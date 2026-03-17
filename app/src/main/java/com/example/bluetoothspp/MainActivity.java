@@ -109,8 +109,9 @@ public class MainActivity extends AppCompatActivity {
                     int bytes = inputStream.read(buffer);
                     byte[] data = new byte[bytes];
                     System.arraycopy(buffer, 0, data, 0, bytes);
-                    String displayData = receiveFormatGroup.getCheckedRadioButtonId() == R.id.receiveHex
-                        ? bytesToHex(data) : new String(data);
+                    int checkedId = receiveFormatGroup.getCheckedRadioButtonId();
+                    String displayData = checkedId == R.id.receiveHex ? bytesToHex(data)
+                        : checkedId == R.id.receiveDec ? bytesToDec(data) : new String(data);
                     String log = getTimestamp() + " RX: " + displayData;
                     logList.add(log);
                     runOnUiThread(() -> logText.append(log + "\n"));
@@ -168,6 +169,14 @@ public class MainActivity extends AppCompatActivity {
         StringBuilder sb = new StringBuilder();
         for (byte b : bytes) {
             sb.append(String.format("%02X ", b));
+        }
+        return sb.toString().trim();
+    }
+
+    private String bytesToDec(byte[] bytes) {
+        StringBuilder sb = new StringBuilder();
+        for (byte b : bytes) {
+            sb.append(String.format("%d ", b & 0xFF));
         }
         return sb.toString().trim();
     }
