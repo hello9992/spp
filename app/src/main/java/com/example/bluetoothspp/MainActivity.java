@@ -86,14 +86,20 @@ public class MainActivity extends AppCompatActivity {
                     int checkedId = receiveFormatGroup.getCheckedRadioButtonId();
                     String displayData = checkedId == R.id.receiveHex ? bytesToHex(data)
                         : checkedId == R.id.receiveDec ? bytesToDec(data) : new String(data);
-                    String log = getTimestamp() + " RX: " + displayData;
-                    logList.add(log);
-                    runOnUiThread(() -> logText.append(log + "\n"));
+                    String log = "RX: " + displayData;
+                    btService.addLog(log);
+                    logList.add(getTimestamp() + " " + log);
+                    runOnUiThread(() -> logText.append(getTimestamp() + " " + log + "\n"));
                 }
 
                 @Override
                 public void onStatusChanged(String status) {
                     runOnUiThread(() -> statusText.setText(status));
+                }
+
+                @Override
+                public void onLogSaved(String path) {
+                    runOnUiThread(() -> Toast.makeText(MainActivity.this, "日志已保存: " + path, Toast.LENGTH_LONG).show());
                 }
             });
         }
@@ -124,7 +130,7 @@ public class MainActivity extends AppCompatActivity {
         String input = sendInput.getText().toString();
         byte[] data = sendFormatGroup.getCheckedRadioButtonId() == R.id.sendHex
             ? hexToBytes(input) : input.getBytes();
-        btService.send(data);
+        btService.send(data, input);
         String log = getTimestamp() + " TX: " + input;
         logList.add(log);
         logText.append(log + "\n");
