@@ -82,6 +82,12 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="接收DEC"/>
+        <RadioButton
+            android:id="@+id/receiveBattery"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="电量解析"/>
     </RadioGroup>
 
     <ScrollView

@@ -84,8 +84,16 @@ public class MainActivity extends AppCompatActivity {
                 @Override
                 public void onDataReceived(byte[] data) {
                     int checkedId = receiveFormatGroup.getCheckedRadioButtonId();
-                    String displayData = checkedId == R.id.receiveHex ? bytesToHex(data)
-                        : checkedId == R.id.receiveDec ? bytesToDec(data) : new String(data);
+                    String displayData;
+                    if (checkedId == R.id.receiveHex) {
+                        displayData = bytesToHex(data);
+                    } else if (checkedId == R.id.receiveDec) {
+                        displayData = bytesToDec(data);
+                    } else if (checkedId == R.id.receiveBattery) {
+                        displayData = bytesToBattery(data);
+                    } else {
+                        displayData = new String(data);
+                    }
                     String log = "RX: " + displayData;
                     btService.addLog(log);
                     logList.add(getTimestamp() + " " + log);
@@ -171,6 +179,19 @@ public class MainActivity extends AppCompatActivity {
             sb.append(String.format("%d ", b & 0xFF));
         }
         return sb.toString().trim();
+    }
+
+    private String bytesToBattery(byte[] bytes) {
+        if (bytes.length < 4) {
+            return "数据长度不足（需要4字节）";
+        }
+        // 数据帧：电压高八位 电压低八位 电量百分比 电量等级
+        int voltageHigh = bytes[0] & 0xFF;
+        int voltageLow = bytes[1] & 0xFF;
+        int voltage = (voltageHigh << 8) | voltageLow;
+        int percentage = bytes[2] & 0xFF;
+        int level = bytes[3] & 0xFF;
+        return String.format("%dmv %d%% 电量等级%d", voltage, percentage, level);
     }
 
     private byte[] hexToBytes(String hex) {
